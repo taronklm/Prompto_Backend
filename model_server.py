@@ -4,7 +4,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import logging
 import time
-from peft import PeftModel
+from peft import PeftModel, PeftConfig
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,30 +13,19 @@ app = FastAPI()
 class InputText(BaseModel):
     input_text: str
 
-# model_name = "taronklm/Qwen2.5-0.5B-Instruct-lora-chatbot"
-# model_name = "taronklm/Qwen2.5-0.5B-Instruct-chatbot"
-model_name = "taronklm/trained_model"
-# model_name = r"C:\Users\Taro\Desktop\bachelorarbeit\code\bot\fine_tuned_model_v1"
-# model_name = r"C:\Users\Taro\Desktop\bachelorarbeit\code\bot\chatbot-backend\fine_tuned_model"
-# model_name = "KingNish/Qwen2.5-0.5b-RBase"
-# model_name = "HuggingFaceTB/SmolLM2-360M-Instruct"
-# model_name = "Qwen/Qwen2.5-0.5B-Instruct-GGUF"
-# model_name = "taronklm/Prompto"
-# model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+peft_name = "taronklm/trained_model"
+model_name = "Qwen/Qwen2.5-0.5B-Instruct"
 
-
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32)
+config = PeftConfig.from_pretrained(peft_name)
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float32)
+model = PeftModel.from_pretrained(model, peft_name)
 print("Model vocab size:", model.config.vocab_size)
 
-lora_model = PeftModel.from_pretrained(model, r"C:\Users\Taro\Desktop\bachelorarbeit\code\bot\fine_tuned_model_v1")
-
-tokenizer = AutoTokenizer.from_pretrained(r"C:\Users\Taro\Desktop\bachelorarbeit\code\bot\fine_tuned_model_v1", trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 print("Tokenizer vocab size:", len(tokenizer))
 
 model.resize_token_embeddings(len(tokenizer))  # Adjust embedding size
-# model = PeftModel.from_pretrained(model, model_id=lora_path)
-
-lora_model.eval()
+model.eval()
 
 SYS_PROMPT ="""
 You are a prompt assistant. You must strictly adhere to the following rules:
@@ -52,32 +41,32 @@ Rules:
 Failing to follow these guidelines is not allowed.
 """
 
-# SYS_PROMPT = """You are an assistant specialized in creating and optimizing prompts."""
-
 async def generate_prompt_response(prompt):
     start_time = time.time()
 
     messages = [{"role": "system", "content":SYS_PROMPT},{"role": "user","content": prompt}]
 
-    text = tokenizer.apply_chat_template(
+    tokenized_chat = tokenizer.apply_chat_template(
         messages,
         tokenize=False,
-        add_generation_prompt=True
+        add_generation_prompt=True,
+        return_tensors="pt"
     )
-    model_inputs = tokenizer([text], return_tensors="pt").to(lora_model.device)
 
-    generated_ids = lora_model.generate(
-        **model_inputs,
+    inputs = tokenizer(tokenized_chat, return_tensors="pt", add_special_tokens=False)
+
+    inputs = {key: tensor.to(model.device) for key, tensor in inputs.items()}
+
+    outputs = model.generate(
+        **inputs,
         max_new_tokens=128,
         temperature=0.1,
         do_sample=True,
         top_k=50,         
         top_p=0.9    
     )
-    generated_ids = [
-        output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-    ]
-    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+    response = tokenizer.decode(outputs[0][inputs['input_ids'].size(1):], skip_special_tokens=True)
 
     end_time = time.time()
     model_response_time = end_time - start_time
