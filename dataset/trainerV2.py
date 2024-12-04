@@ -1,5 +1,6 @@
 from datasets import load_dataset
 import logging
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -122,7 +123,7 @@ tokenizer.save_pretrained("./fine_tuned_model_v1")
 
 from huggingface_hub import login
 
-write_key = "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"
+write_key = os.getenv("WRITE_HUGGINGFACE_TOKEN")
 login(write_key)
 
 logger.info("UPLOADING MODEL...")
