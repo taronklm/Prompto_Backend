@@ -41,7 +41,7 @@ Rules:
 Failing to follow these guidelines is not allowed.
 """
 
-async def generate_prompt_response(prompt):
+def generate_prompt_response(prompt):
     start_time = time.time()
 
     messages = [{"role": "system", "content":SYS_PROMPT},{"role": "user","content": prompt}]
@@ -77,7 +77,7 @@ async def generate_prompt_response(prompt):
     return response
 
 @app.post("/generate")
-async def generate_endpoint(input_data: InputText):
+def generate_endpoint(input_data: InputText):
     input_text = input_data.input_text
 
     print("INPUT TEXT: ", input_text)
@@ -85,7 +85,7 @@ async def generate_endpoint(input_data: InputText):
     if not input_text:
         raise HTTPException(status_code=400, detail="Input text is required")
     
-    generated_text = await generate_prompt_response(input_text)
+    generated_text = generate_prompt_response(input_text)
 
     print("GENERATED TEXT: ", generated_text)
     return {"generated_text": generated_text}
