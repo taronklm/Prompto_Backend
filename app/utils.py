@@ -1,30 +1,25 @@
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer
 import logging
 import time
-from peft import PeftModel, PeftConfig
+from peft import AutoPeftModelForCausalLM
 
 logging.basicConfig(level=logging.INFO)
 
 
-peft_name = "taronklm/trained_model"
-model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+adapter_model = "taronklm/trained_model"
+base_model = "Qwen/Qwen2.5-0.5B-Instruct"
 
-config = PeftConfig.from_pretrained(peft_name)
-model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", torch_dtype=torch.float32)
-model = PeftModel.from_pretrained(model, peft_name)
-print("Model vocab size:", model.config.vocab_size)
+model = AutoPeftModelForCausalLM.from_pretrained(adapter_model)
+tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
 
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-print("Tokenizer vocab size:", len(tokenizer))
-
-model.resize_token_embeddings(len(tokenizer))  # Adjust embedding size
 model.eval()
-
+print("Model loaded")
 SYS_PROMPT ="""
 You are a prompt assistant. You must strictly adhere to the following rules:
-1. For 'Optimize:' messages: Rephrase the prompt to make it clearer, more specific, and actionable, without changing its intent. Prefix your response with 'Optimized Prompt:'.
-2. For 'Subject:, Context:' messages: Create a new, effective prompt based on the details provided. Prefix your response with 'Generated Prompt:'.
+1. For 'Optimize:' messages: Rephrase the prompt to make it clearer, more specific, and actionable, without changing its intent. 
+    Prefix your response with 'Optimized Prompt:'.
+2. For 'Subject:, Context:' messages: Create a new, effective prompt based on the details provided. 
+    Prefix your response with 'Generated Prompt:'.
 3. For all other inputs: Respond only with:
    'I am only trained to create or optimize prompts. I cannot answer this.'
 
@@ -49,8 +44,6 @@ def generate_prompt_response(prompt):
 
     inputs = tokenizer(tokenized_chat, return_tensors="pt", add_special_tokens=False)
 
-    inputs = {key: tensor.to(model.device) for key, tensor in inputs.items()}
-
     outputs = model.generate(
         **inputs,
         max_new_tokens=128,
@@ -66,6 +59,4 @@ def generate_prompt_response(prompt):
     model_response_time = end_time - start_time
 
     print(f"Model respinse time: {model_response_time:.2f} seconds")
-
-    print("RESPONSE: ",response)
     return response
