@@ -1,6 +1,7 @@
 from transformers import AutoTokenizer
 import logging
 import time
+import psutil
 from peft import AutoPeftModelForCausalLM
 
 logging.basicConfig(level=logging.INFO)
@@ -10,6 +11,7 @@ adapter_model = "taronklm/trained_model"
 base_model = "Qwen/Qwen2.5-0.5B-Instruct"
 
 model = AutoPeftModelForCausalLM.from_pretrained(adapter_model)
+# model = AutoModelForCausalLM.from_pretrained(base_model)
 tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
 
 model.eval()
@@ -31,7 +33,14 @@ Failing to follow these guidelines is not allowed.
 """
 
 def generate_prompt_response(prompt):
+    process = psutil.Process()
     start_time = time.time()
+
+    initial_memory = process.memory_info().rss / (1024 * 1024)
+    initial_cpu = process.cpu_percent()
+
+    initial_tokens = len(tokenizer.tokenize(prompt))
+    print(tokenizer.tokenize(prompt))
 
     messages = [{"role": "system", "content":SYS_PROMPT},{"role": "user","content": prompt}]
 
@@ -55,8 +64,19 @@ def generate_prompt_response(prompt):
 
     response = tokenizer.decode(outputs[0][inputs['input_ids'].size(1):], skip_special_tokens=True)
 
+    generated_tokens = len(tokenizer.tokenize(response))
+
+    print(tokenizer.tokenize(response))
+
+    final_memory = process.memory_info().rss / (1024 * 1024)
     end_time = time.time()
     model_response_time = end_time - start_time
+    final_cpu = process.cpu_percent()
 
-    print(f"Model respinse time: {model_response_time:.2f} seconds")
+    print(f"Model response time: {model_response_time:.2f} seconds")
+    print(f"Final Memory Usage: {final_memory:.2f} MB")
+    print(f"Final CPU Usage: {(final_cpu/6):.2f}%")
+    print(f"Initial Token Count: {initial_tokens}")
+    print(f"Generated Token Count: {generated_tokens}")
+
     return response
