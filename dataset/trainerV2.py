@@ -106,6 +106,28 @@ training_args = SFTConfig(
     eval_steps=10
 )
 
+logger.info("DEFINE METRIC FUNCTION")
+import numpy as np
+from evaluate import load
+
+bertscore = load("bertscore")
+
+def compute_metrics(eval_preds):
+    logits, labels = eval_preds
+
+    predictions = np.argmax(logits, axis=-1)
+
+    decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
+    bertscore_metrics = bertscore.compute(predictions=decoded_preds, references=decoded_labels, lang="de")
+
+    return {
+        "bertscore_precision": np.mean(bertscore_metrics["precision"]),
+        "bertscore_recall": np.mean(bertscore_metrics["recall"]),
+        "bertscore_f1": np.mean(bertscore_metrics["f1"]),
+    }
+
 logger.info("DEFINE SFTTRAINER...")
 trainer = SFTTrainer(
     model=model,
@@ -113,7 +135,8 @@ trainer = SFTTrainer(
     train_dataset=processed_train_dataset,
     eval_dataset=processed_eval_dataset,
     tokenizer=tokenizer,
-    peft_config=peft_config
+    peft_config=peft_config,
+    compute_metrics=compute_metrics
 )
 
 print(trainer)
