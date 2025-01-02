@@ -5,9 +5,7 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 logger.info("LOADING DATASET...")
-# ds = load_dataset("json", data_files=r"C:\Users\Taro\Desktop\bachelorarbeit\code\bot\chatbot-backend\dataset\dataset_v6.json", split="train")
 ds = load_dataset("taronklm/Prompto_v6", split="train")
 
 logger.info("SPLITTING DATASET...")
@@ -19,6 +17,7 @@ print(ds[0])
 logger.info("SHUFFLE DATASET...")
 ds = ds.shuffle()
 print(ds[0])
+
 from transformers import AutoTokenizer
 
 logger.info("SETTING MODEL NAME AND LOADING TOKENIZER...")
@@ -28,7 +27,6 @@ tokenizer.pad_token = tokenizer.eos_token
 
 from transformers import AutoModelForCausalLM
 import torch
-
 
 def apply_chat_template(example,tokenizer):
     messages = example["messages"]
@@ -42,9 +40,7 @@ logger.info("LOADING MODEL...")
 model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32,)
 
 from trl import SFTTrainer, SFTConfig
-
 from peft import LoraConfig
-
 
 logger.info("PREPROCESSING TRAINING DATASET...")
 processed_train_dataset = train_ds.map(
@@ -107,6 +103,7 @@ training_args = SFTConfig(
 )
 
 logger.info("DEFINE METRIC FUNCTION")
+
 import numpy as np
 from evaluate import load
 
